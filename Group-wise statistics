@@ -1,0 +1,122 @@
+#===============================================================================
+# Course: Econometrics
+# Instructor: Abdulbaki Bilgic
+#===============================================================================
+# clean the memory 
+rm(list=ls()); cat("\f"); graphics.off(); shell("cls")
+#===============================================================================
+# Generic Multi-Level Summary Statistics Generator
+# Creates separate data frames for all possible grouping levels (1-way, 2-way, 
+# ..., N-way). This program Works with any number of categorical (grouping) and 
+# numerical (target) variables
+#===============================================================================
+summarize_stats_groupwise <- function(data, group_vars, target_vars) {
+  # download required libraries:
+  library(dplyr)
+  library(purrr)
+  #-----------------------------------------------------------------------------
+  # Input validation:
+  #-----------------------------------------------------------------------------
+  if (!all(group_vars %in% names(data))) {
+    stop("Some grouping variables are not found in the dataset.")
+  }
+  if (!all(target_vars %in% names(data))) {
+    stop("Some target variables are not found in the dataset.")
+  }
+  #-----------------------------------------------------------------------------
+  # Helper function: compute summary statistics for a single variable and grouping:
+  #-----------------------------------------------------------------------------
+  summarize_single <- function(data, grouping, var, all_group_vars) {
+    summarized <- data %>%
+      group_by(across(all_of(grouping))) %>%
+      summarise(
+        n          = sum(!is.na(.data[[var]])),
+        mean_value = mean(.data[[var]], na.rm = TRUE),
+        sd_value   = sd(.data[[var]], na.rm = TRUE),
+        se_value   = sd_value / sqrt(n),
+        ci_lower   = mean_value - qt(0.975, df = n - 1) * se_value,
+        ci_upper   = mean_value + qt(0.975, df = n - 1) * se_value,
+        t_value    = mean_value / se_value,
+        p_value    = 2 * (1 - pt(abs(t_value), df = n - 1)),
+        .groups    = "drop"
+      ) %>%
+      mutate(
+        Variable   = var,
+        Grouping   = paste(grouping, collapse = " + "),
+        mean_value = sprintf("%.3f",mean_value),
+        sd_value   = sprintf("%.3f",sd_value),
+        se_value   = sprintf("%.3f",se_value),
+        ci_lower   = sprintf("%.3f",ci_lower),
+        ci_upper   = sprintf("%.3f",ci_upper),
+        t_value    = sprintf("%.3f",t_value),
+        p_value    = sprintf("%.3f",p_value)
+      )
+    
+    # Add missing grouping columns as NA:
+    for (col in setdiff(all_group_vars, grouping)) {
+      summarized[[col]] <- NA
+    }
+    # Reorder columns to the desired structure:
+    summarized <- summarized %>%
+      select(
+        Variable,
+        all_of(all_group_vars),
+        Grouping,
+        n, mean_value, sd_value, se_value,
+        ci_lower, ci_upper, t_value, p_value
+      )
+    
+    return(summarized)
+  }
+  #-----------------------------------------------------------------------------
+  # Automatically create data frames for all grouping levels:
+  #-----------------------------------------------------------------------------
+  results_list <- list()
+  
+  for (k in seq_along(group_vars)) {
+    combo_list <- combn(group_vars, k, simplify = FALSE)
+    result_df  <- map_dfr(target_vars, function(var) {
+      map_dfr(combo_list, function(gv) summarize_single(data, gv, var, group_vars))
+    })
+    results_list[[paste0("results_", k, "way")]] <- result_df
+  }
+  #-----------------------------------------------------------------------------
+  # Assign each data frame to the global environment:
+  #-----------------------------------------------------------------------------
+  list2env(results_list, envir = .GlobalEnv)
+  #-----------------------------------------------------------------------------
+  # Completion message:
+  #-----------------------------------------------------------------------------
+  message("✅ DataFrames created for all grouping levels: ",
+          paste(names(results_list), collapse = ", "),
+          " (columns ordered correctly).")
+  
+  invisible(results_list)
+}
+#===============================================================================
+# Example usage with pseudo (synthetic) data:
+#===============================================================================
+set.seed(123)
+
+n   <- 3000
+synthetic_data <- data.frame(
+  Year        = sample(2020:2022, n, replace = TRUE),
+  Irrigation  = sample(c("Low", "Medium", "High"), n, replace = TRUE),
+  Variety     = sample(c("A", "B", "C", "D"), n, replace = TRUE),
+  Location    = sample(c("North", "South"), n, replace = TRUE),
+  Yield       = rnorm(n, mean = 50, sd = 10),
+  Height      = rnorm(n, mean = 120, sd = 15),
+  Protein     = rnorm(n, mean = 12, sd = 2)
+)
+
+# Run the generic summary generator: (this is your mail call)
+summarize_stats_groupwise(
+  data        = synthetic_data,
+  group_vars  = c("Year", "Irrigation", "Variety", "Location"),
+  target_vars = c("Yield", "Height", "Protein")
+)
+
+# After running, the following data frames will be available:
+results_1way; results_2way; results_3way; results_4way
+
+#===============================================================================
