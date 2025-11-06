@@ -109,7 +109,7 @@ synthetic_data <- data.frame(
   Protein     = rnorm(n, mean = 12, sd = 2)
 )
 
-# Run the generic summary generator: (this is your mail call)
+# Run the generic summary generator: (this is your main call)
 summarize_stats_groupwise(
   data        = synthetic_data,
   group_vars  = c("Year", "Irrigation", "Variety", "Location"),
