@@ -87,7 +87,7 @@ summarize_stats_groupwise <- function(data, group_vars, target_vars) {
   #-----------------------------------------------------------------------------
   # Completion message:
   #-----------------------------------------------------------------------------
-  message("✅ DataFrames created for all grouping levels: ",
+  message("DataFrames created for all grouping levels: ",
           paste(names(results_list), collapse = ", "),
           " (columns ordered correctly).")
   
